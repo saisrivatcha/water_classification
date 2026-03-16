@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ML File Upload</title>
+
+<style>
+
+body{
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin:0;
+    height:100vh;
+
+    /* Background Image */
+    background-image: url("https://th.bing.com/th/id/R.433d8da4e50c689b7f2ebc8fb4a3c2ab?rik=Vd6HatR%2f6PhxyA&riu=http%3a%2f%2fwww.baltana.com%2ffiles%2fwallpapers-4%2fWater-Background-HD-Desktop-Wallpaper-14610.jpg&ehk=2jWd2x5F0UjWQCFDCmCqvvbWZTPilSPvO4tyM%2bEcnQs%3d&risl=&pid=ImgRaw&r=0");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.container{
+    background: rgba(255,255,255,0.85);
+    padding:40px;
+    border-radius:10px;
+    width:320px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+}
+
+button{
+    padding:10px 20px;
+    background:#4CAF50;
+    color:white;
+    border:none;
+    cursor:pointer;
+    border-radius:5px;
+}
+
+button:hover{
+    background:#45a049;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Upload File for Water Classification</h2>
+
+<input type="file" id="fileInput">
+<br><br>
+
+<button onclick="uploadFile()">Upload</button>
+
+<p id="result"></p>
+
+</div>
+
+<script>
+
+function uploadFile(){
+
+    let file = document.getElementById("fileInput").files[0];
+
+    let formData = new FormData();
+    formData.append("file", file);
+
+    fetch("http://localhost:5000/predict",{
+        method:"POST",
+        body:formData
+    })
+
+    .then(response => response.json())
+    .then(data=>{
+        document.getElementById("result").innerText =
+        "Prediction: " + data.result;
+    })
+
+    .catch(error=>{
+        console.log(error);
+    });
+
+}
+
+</script>
+</body>
+</html>
