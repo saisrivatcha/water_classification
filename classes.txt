@@ -1,8 +1,8 @@
-Fish pond
-Sea water
-clean
-industrial wastewater
-lake
-muddy
-polluted
-river
+Clean Water
+Industrail water
+Lake
+Muddy Water
+Seawater
+fishpond
+pollutedwater
+riverwater

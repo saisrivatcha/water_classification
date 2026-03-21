@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, models, transforms
 
 # Configuration
-DATA_DIR = '.'  # Root directory containing class folders
+DATA_DIR = 'dataset'
 BATCH_SIZE = 32
 EPOCHS = 10
 LEARNING_RATE = 0.001
@@ -48,15 +48,10 @@ class CustomDataset(torch.utils.data.Dataset):
         return len(self.subset)
 
 def get_dataloaders():
-    # We will ignore files/directories that are not part of the dataset, 
-    # but ImageFolder expects clean class folders.
-    # Note: prepare_data.py should have prepared the folders.
     
     # Let's load all images with a dummy transform first just to get structure
     print("Loading dataset from", DATA_DIR)
-    
-    # Ensure we only load from the required class folders if possible, or just load all subfolders.
-    # We assume prepare_data.py has renamed the subfolders.
+
     full_dataset = datasets.ImageFolder(root=DATA_DIR)
     class_names = full_dataset.classes
     print(f"Discovered classes: {class_names}")
@@ -151,6 +146,7 @@ def train_model():
         
         if val_acc > best_acc:
             best_acc = val_acc
+            
             torch.save(model.state_dict(), MODEL_SAVE_PATH)
             print(f"Saved new best model with accuracy: {best_acc:.4f}")
             

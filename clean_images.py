@@ -14,12 +14,17 @@ def clean_dataset(directory):
                         img.verify() # Verify that it is, in fact, an image
                 except Exception as e:
                     print(f"Removing corrupted image: {filepath} - Error: {e}")
-                    os.remove(filepath)
-                    removed_count += 1
+                    try:
+                        abs_path = os.path.abspath(filepath)
+                        long_path = "\\\\?\\" + abs_path
+                        os.remove(long_path)
+                        removed_count += 1
+                    except Exception as rm_e:
+                        print(f"Failed to remove {filepath}: {rm_e}")
     
     print(f"Finished scanning {total_count} images.")
     print(f"Removed {removed_count} corrupted images.")
 
 if __name__ == '__main__':
-    dataset_dir = '.'
+    dataset_dir = 'dataset'
     clean_dataset(dataset_dir)
