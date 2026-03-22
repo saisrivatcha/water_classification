@@ -1,0 +1,5 @@
+{
+  "model_efficientnet.pth": 0.3355,
+  "model_resnet50.pth": 0.3399,
+  "model_mobilenetv3.pth": 0.3246
+}
