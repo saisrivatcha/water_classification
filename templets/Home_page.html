@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Water Quality Index</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f4f6f3;
+    --surface:   #ffffff;
+    --surface2:  #f0f2ef;
+    --border:    rgba(0,0,0,0.10);
+    --border2:   rgba(0,0,0,0.18);
+    --text:      #1a1f18;
+    --text2:     #5a6358;
+    --text3:     #8e9b8c;
+    --teal:      #1D9E75;
+    --teal-dark: #0F6E56;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Fraunces', Georgia, serif;
+    min-height: 100vh;
+    padding: 0 1rem 4rem;
+  }
+
+  .page { max-width: 780px; margin: 0 auto; padding-top: 2rem; }
+
+  .header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 0.5px solid var(--border2);
+  }
+  .header-text h1 { font-size: 28px; font-weight: 400; letter-spacing: -0.02em; }
+  .header-text p  { font-size: 13px; font-family: 'DM Mono', monospace; color: var(--text2); margin-top: 4px; }
+
+  .inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-bottom: 1.75rem;
+  }
+
+  .field {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field:focus-within {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(29,158,117,0.12);
+  }
+  .field-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .field-label {
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .field-unit {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--text3); background: var(--surface2);
+    padding: 2px 7px; border-radius: 30px;
+  }
+  .field input[type=number] {
+    width: 100%; background: transparent; border: none;
+    border-bottom: 1.5px solid var(--border2); border-radius: 0;
+    outline: none; font-family: 'DM Mono', monospace;
+    font-size: 22px; font-weight: 500; color: var(--text);
+    padding: 4px 0 6px; transition: border-color 0.15s;
+  }
+  .field input[type=number]:focus { border-bottom-color: var(--teal); }
+  .field input[type=number]::-webkit-inner-spin-button,
+  .field input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .field input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--surface2); outline: none;
+    margin-top: 12px; cursor: pointer;
+  }
+  .field input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--teal);
+    border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    cursor: pointer; transition: transform 0.1s;
+  }
+  .field input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  .field input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--teal); border: 2px solid #fff; cursor: pointer;
+  }
+  .range-vals {
+    display: flex; justify-content: space-between;
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--text3); margin-top: 4px;
+  }
+
+  /* ideal value hint */
+  .ideal-hint {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--teal); margin-top: 6px;
+  }
+
+  .calc-btn {
+    width: 100%; padding: 15px;
+    background: var(--teal); color: #fff; border: none;
+    border-radius: var(--radius-lg); font-family: 'Fraunces', serif;
+    font-size: 17px; font-weight: 400; cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    margin-bottom: 2.5rem;
+    box-shadow: 0 4px 18px rgba(29,158,117,0.22);
+  }
+  .calc-btn:hover  { background: var(--teal-dark); box-shadow: 0 6px 22px rgba(29,158,117,0.30); }
+  .calc-btn:active { transform: scale(0.99); }
+
+  .result-section { display: none; }
+  .result-section.visible {
+    display: block;
+    animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1);
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .meter-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem 1.5rem 1.75rem;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .meter-svg-wrap { margin: 0 auto 1.25rem; width: 300px; height: 170px; }
+
+  .wqi-score {
+    font-size: 58px; font-weight: 300; line-height: 1;
+    margin-bottom: 6px; transition: color 0.4s;
+  }
+  .wqi-label {
+    font-size: 14px; font-family: 'DM Mono', monospace;
+    font-weight: 500; letter-spacing: 0.08em;
+    text-transform: uppercase; transition: color 0.4s;
+  }
+  .wqi-desc {
+    font-size: 14px; color: var(--text2);
+    margin-top: 8px; font-style: italic; font-weight: 300;
+  }
+
+  .bands {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; margin-bottom: 14px;
+  }
+  @media (max-width: 540px) { .bands { grid-template-columns: repeat(3, 1fr); } }
+  .band {
+    border-radius: var(--radius-md); padding: 10px 6px;
+    text-align: center; border: 2px solid transparent;
+    transition: border-color 0.25s, transform 0.2s;
+  }
+  .band.active { border-color: rgba(0,0,0,0.35); transform: translateY(-2px); }
+  .band-range { font-size: 10px; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+  .band-name  { font-size: 12px; font-weight: 500; }
+
+  .params-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .param-chip {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-md); padding: 12px 14px;
+  }
+  .param-chip-label {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--text3); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 5px;
+  }
+  .param-chip-val {
+    font-size: 18px; font-weight: 500;
+    font-family: 'DM Mono', monospace; color: var(--text);
+  }
+  .param-chip-qi {
+    font-size: 11px; color: var(--text2);
+    margin-top: 3px; font-family: 'DM Mono', monospace;
+  }
+  .qi-bar-bg {
+    height: 3px; background: var(--surface2);
+    border-radius: 2px; margin-top: 6px; overflow: hidden;
+  }
+  .qi-bar-fill {
+    height: 100%; border-radius: 2px; background: var(--teal);
+    transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+
+  .formula-note {
+    margin-top: 1.5rem; padding: 14px 18px;
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 12px; font-family: 'DM Mono', monospace;
+    color: var(--text2); line-height: 1.9;
+  }
+  .formula-note strong { color: var(--text); font-weight: 500; }
+
+  /* reference table */
+  .ref-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-size: 13px; }
+  .ref-table th {
+    text-align: left; font-family: 'DM Mono', monospace;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text3); padding: 6px 10px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .ref-table td {
+    padding: 8px 10px; border-bottom: 0.5px solid var(--border);
+    font-family: 'DM Mono', monospace; color: var(--text2);
+  }
+  .ref-table tr:last-child td { border-bottom: none; }
+
+  /* NAV */
+  .nav{background:var(--surface);border-bottom:.5px solid var(--border2);padding:0 2rem;display:flex;align-items:center;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 var(--border)}
+  .nav-brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:400;color:var(--text);margin-right:2rem;text-decoration:none}
+  .nav-links{display:flex;align-items:center;gap:0;overflow-x:auto}
+  .nav-link{height:54px;display:flex;align-items:center;padding:0 14px;font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);text-decoration:none;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
+  .nav-link:hover{color:var(--text)}
+  .nav-link.active{color:var(--teal);border-bottom-color:var(--teal)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="Home_page.html">
+    <svg width="22" height="26" viewBox="0 0 48 56" fill="none"><path d="M24 4C24 4 6 22 6 34A18 18 0 0 0 42 34C42 22 24 4 24 4Z" fill="#1D9E75" opacity=".9"/></svg>
+    AquaML
+  </a>
+  <div class="nav-links">
+    <a class="nav-link active" href="Home_page.html">WQI Calculator</a>
+    <a class="nav-link" href="Prediction_page.html">Forecast</a>
+    <a class="nav-link" href="anomoly_detection.html">Anomaly Detection</a>
+    <a class="nav-link" href="Classification.html">Classification</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <svg width="48" height="56" viewBox="0 0 48 56" fill="none">
+      <path d="M24 4 C24 4 6 22 6 34 A18 18 0 0 0 42 34 C42 22 24 4 24 4Z" fill="#1D9E75" opacity="0.9"/>
+      <path d="M15 38 Q19 32 24 35 Q29 38 33 31" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="header-text">
+      <h1>Water Quality Index</h1>
+      <p>WHO standard reference values · weighted sub-index method</p>
+    </div>
+  </div>
+
+  <!-- Inputs -->
+  <div class="inputs-grid">
+
+    <div class="field">
+      <div class="field-top">
+        <span class="field-label">pH</span>
+        <span class="field-unit">0 – 14</span>
+      </div>
+      <input type="number" id="ph" min="0" max="14" step="0.1" value="7.0"
+             oninput="syncRange('ph','phR')"/>
+      <input type="range"  id="phR" min="0" max="14" step="0.1" value="7.0"
+             oninput="syncNum('phR','ph')"/>
+      <div class="range-vals"><span>0</span><span>7</span><span>14</span></div>
+      <div class="ideal-hint">ideal: 7.0 &nbsp;|&nbsp; limit: 6.5–8.5</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <span class="field-label">Turbidity</span>
+        <span class="field-unit">NTU</span>
+      </div>
+      <input type="number" id="turb" min="0" max="100" step="0.1" value="1.0"
+             oninput="syncRange('turb','turbR')"/>
+      <input type="range"  id="turbR" min="0" max="100" step="0.1" value="1.0"
+             oninput="syncNum('turbR','turb')"/>
+      <div class="range-vals"><span>0</span><span>50</span><span>100</span></div>
+      <div class="ideal-hint">ideal: 0 &nbsp;|&nbsp; limit: 5 NTU</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <span class="field-label">Conductivity</span>
+        <span class="field-unit">µS/cm</span>
+      </div>
+      <input type="number" id="cond" min="0" max="2000" step="1" value="400"
+             oninput="syncRange('cond','condR')"/>
+      <input type="range"  id="condR" min="0" max="2000" step="1" value="400"
+             oninput="syncNum('condR','cond')"/>
+      <div class="range-vals"><span>0</span><span>1000</span><span>2000</span></div>
+      <div class="ideal-hint">ideal: 0 &nbsp;|&nbsp; limit: 1500 µS/cm</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <span class="field-label">Dissolved O₂</span>
+        <span class="field-unit">mg/L</span>
+      </div>
+      <input type="number" id="do" min="0" max="20" step="0.1" value="8.0"
+             oninput="syncRange('do','doR')"/>
+      <input type="range"  id="doR" min="0" max="20" step="0.1" value="8.0"
+             oninput="syncNum('doR','do')"/>
+      <div class="range-vals"><span>0</span><span>10</span><span>20</span></div>
+      <div class="ideal-hint">ideal: ≥8 mg/L &nbsp;|&nbsp; limit: 5 mg/L</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <span class="field-label">Temperature</span>
+        <span class="field-unit">°C</span>
+      </div>
+      <input type="number" id="temp" min="0" max="45" step="0.1" value="25.0"
+             oninput="syncRange('temp','tempR')"/>
+      <input type="range"  id="tempR" min="0" max="45" step="0.1" value="25.0"
+             oninput="syncNum('tempR','temp')"/>
+      <div class="range-vals"><span>0</span><span>22</span><span>45</span></div>
+      <div class="ideal-hint">ideal: 25°C &nbsp;|&nbsp; limit: ±10°C</div>
+    </div>
+
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">Calculate Water Quality Index →</button>
+
+  <!-- Results -->
+  <div class="result-section" id="results">
+
+    <div class="meter-card">
+      <div class="meter-svg-wrap">
+        <svg id="meterSvg" viewBox="0 0 300 170" width="300" height="170" style="overflow:visible">
+          <defs>
+            <clipPath id="halfClip"><rect x="0" y="0" width="300" height="155"/></clipPath>
+          </defs>
+          <g clip-path="url(#halfClip)">
+            <path id="arc0" fill="#C0DD97"/>
+            <path id="arc1" fill="#a8d47a"/>
+            <path id="arc2" fill="#FAC775"/>
+            <path id="arc3" fill="#F09595"/>
+            <path id="arc4" fill="#E24B4A"/>
+          </g>
+          <circle cx="150" cy="155" r="72" fill="#ffffff"/>
+          <line id="needle" x1="150" y1="155" x2="90" y2="128"
+                stroke="#1a1f18" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="150" cy="155" r="6" fill="#1a1f18"/>
+          <text x="12"  y="166" font-size="10" font-family="'DM Mono',monospace" fill="#3B6D11">0</text>
+          <text x="136" y="28"  font-size="10" font-family="'DM Mono',monospace" fill="#854F0B">50</text>
+          <text x="262" y="166" font-size="10" font-family="'DM Mono',monospace" fill="#A32D2D">100</text>
+        </svg>
+      </div>
+      <div class="wqi-score" id="scoreNum">—</div>
+      <div class="wqi-label" id="scoreLabel">—</div>
+      <div class="wqi-desc"  id="scoreDesc"></div>
+    </div>
+
+    <div class="bands">
+      <div class="band" data-min="0"   data-max="25"   style="background:#EAF3DE">
+        <div class="band-range" style="color:#3B6D11">0–25</div>
+        <div class="band-name"  style="color:#3B6D11">Excellent</div>
+      </div>
+      <div class="band" data-min="26"  data-max="50"   style="background:#C0DD97">
+        <div class="band-range" style="color:#27500A">26–50</div>
+        <div class="band-name"  style="color:#27500A">Good</div>
+      </div>
+      <div class="band" data-min="51"  data-max="75"   style="background:#FAC775">
+        <div class="band-range" style="color:#633806">51–75</div>
+        <div class="band-name"  style="color:#633806">Poor</div>
+      </div>
+      <div class="band" data-min="76"  data-max="100"  style="background:#F09595">
+        <div class="band-range" style="color:#791F1F">76–100</div>
+        <div class="band-name"  style="color:#791F1F">Very Poor</div>
+      </div>
+      <div class="band" data-min="101" data-max="9999" style="background:#E24B4A">
+        <div class="band-range" style="color:#fff">&gt;100</div>
+        <div class="band-name"  style="color:#fff">Unsuitable</div>
+      </div>
+    </div>
+
+    <div class="params-row" id="paramChips"></div>
+
+    <div class="formula-note">
+      <strong>How WQI is calculated (WHO standard method):</strong><br/>
+      1. Each parameter gets a sub-index Qᵢ = ((V – Videal) / (Vlimit – Videal)) × 100<br/>
+      2. WQI = Σ(Qᵢ × Wᵢ) &nbsp;·&nbsp; Weights: pH 25% · Turbidity 25% · Conductivity 20% · D.O. 20% · Temp 10%<br/>
+      <strong>Reference:</strong> pH ideal=7, limit=8.5 · Turbidity ideal=0, limit=5 NTU · Conductivity ideal=0, limit=1500 · D.O. ideal=14, limit=5 · Temp ideal=25°C, limit=35°C
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function syncRange(numId, rngId) {
+    document.getElementById(rngId).value = document.getElementById(numId).value;
+  }
+  function syncNum(rngId, numId) {
+    document.getElementById(numId).value = document.getElementById(rngId).value;
+  }
+
+  /* ── WHO standard sub-index: Qi = ((V - Videal) / (Vlimit - Videal)) * 100 ── */
+  /*    clamped 0–100, higher = worse                                             */
+
+  function calcQi(val, ideal, limit) {
+    if (limit === ideal) return 0;
+    const qi = Math.abs((val - ideal) / (limit - ideal)) * 100;
+    return Math.min(Math.max(qi, 0), 100);
+  }
+
+  /*
+    Parameter reference values (WHO / BIS standards):
+    ─────────────────────────────────────────────────
+    pH          ideal = 7.0   limit = 8.5
+    Turbidity   ideal = 0     limit = 5 NTU
+    Conductivity ideal = 0    limit = 1500 µS/cm
+    D.O.        ideal = 14    limit = 5   (HIGH D.O. = good, so ideal is max)
+    Temperature ideal = 25°C  limit = 35°C
+  */
+
+  function calculate() {
+    const ph   = parseFloat(document.getElementById('ph').value);
+    const turb = parseFloat(document.getElementById('turb').value);
+    const cond = parseFloat(document.getElementById('cond').value);
+    const doV  = parseFloat(document.getElementById('do').value);
+    const temp = parseFloat(document.getElementById('temp').value);
+
+    /* Sub-indices */
+    const qPh   = calcQi(ph,   7.0,  8.5);
+    const qTurb = calcQi(turb, 0,    5);
+    const qCond = calcQi(cond, 0,    1500);
+    const qDo   = calcQi(doV,  14,   5);   /* reversed: ideal=14, limit=5 */
+    const qTemp = calcQi(temp, 25,   35);
+
+    /* Weighted WQI */
+    const wqi = qPh*0.25 + qTurb*0.25 + qCond*0.20 + qDo*0.20 + qTemp*0.10;
+    const score = Math.round(wqi);
+
+    /* Classification */
+    let label, desc, color;
+    if      (score <= 25)  { label='Excellent';  color='#3B6D11'; desc='Water is clean and safe for all uses including drinking.'; }
+    else if (score <= 50)  { label='Good';        color='#27500A'; desc='Acceptable quality. Suitable for most uses with minimal treatment.'; }
+    else if (score <= 75)  { label='Poor';        color='#854F0B'; desc='Polluted water. Treatment recommended before consumption.'; }
+    else if (score <= 100) { label='Very Poor';   color='#791F1F'; desc='Heavily polluted. Not safe to drink without extensive treatment.'; }
+    else                   { label='Unsuitable';  color='#501313'; desc='Water is unsafe. Requires urgent remediation.'; }
+
+    document.getElementById('scoreNum').textContent   = score;
+    document.getElementById('scoreLabel').textContent = label;
+    document.getElementById('scoreDesc').textContent  = desc;
+    document.getElementById('scoreNum').style.color   = color;
+    document.getElementById('scoreLabel').style.color = color;
+
+    /* Highlight band */
+    document.querySelectorAll('.band').forEach(b => {
+      const mn = +b.dataset.min, mx = +b.dataset.max;
+      b.classList.toggle('active', score >= mn && score <= mx);
+    });
+
+    /* Param chips */
+    const params = [
+      { name:'pH',           val: ph.toFixed(1),   unit:'',       qi: Math.round(qPh),   ideal:'7.0',  limit:'8.5'  },
+      { name:'Turbidity',    val: turb.toFixed(1),  unit:' NTU',   qi: Math.round(qTurb), ideal:'0',    limit:'5'    },
+      { name:'Conductivity', val: cond.toFixed(0),  unit:' µS/cm', qi: Math.round(qCond), ideal:'0',    limit:'1500' },
+      { name:'D.O.',         val: doV.toFixed(1),   unit:' mg/L',  qi: Math.round(qDo),   ideal:'14',   limit:'5'    },
+      { name:'Temperature',  val: temp.toFixed(1),  unit:'°C',     qi: Math.round(qTemp), ideal:'25°C', limit:'35°C' },
+    ];
+
+    document.getElementById('paramChips').innerHTML = params.map(p => `
+      <div class="param-chip">
+        <div class="param-chip-label">${p.name}</div>
+        <div class="param-chip-val">${p.val}${p.unit}</div>
+        <div class="param-chip-qi">sub-index: ${p.qi}/100</div>
+        <div class="qi-bar-bg">
+          <div class="qi-bar-fill" style="width:${p.qi}%; background:${p.qi<=25?'#1D9E75':p.qi<=50?'#639922':p.qi<=75?'#EF9F27':'#E24B4A'}"></div>
+        </div>
+      </div>
+    `).join('');
+
+    drawMeter(score);
+
+    const res = document.getElementById('results');
+    res.classList.remove('visible');
+    void res.offsetWidth;
+    res.classList.add('visible');
+  }
+
+  /* ── Semicircular gauge ── */
+  function arcSlice(cx, cy, r, startDeg, endDeg) {
+    const toRad = d => d * Math.PI / 180;
+    const s = toRad(startDeg), e = toRad(endDeg);
+    const x1 = cx + r*Math.cos(s), y1 = cy + r*Math.sin(s);
+    const x2 = cx + r*Math.cos(e), y2 = cy + r*Math.sin(e);
+    const large = (endDeg - startDeg) > 180 ? 1 : 0;
+    return `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+  }
+
+  function drawMeter(score) {
+    const cx = 150, cy = 155, r = 138;
+    /* 5 equal segments over 180° */
+    const segments = [
+      { id:'arc0', from:0,  to:20  },
+      { id:'arc1', from:20, to:40  },
+      { id:'arc2', from:40, to:60  },
+      { id:'arc3', from:60, to:80  },
+      { id:'arc4', from:80, to:100 },
+    ];
+    segments.forEach(seg => {
+      const s = 180 + (seg.from / 100) * 180;
+      const e = 180 + (seg.to   / 100) * 180;
+      document.getElementById(seg.id).setAttribute('d', arcSlice(cx, cy, r, s, e));
+    });
+
+    /* Needle: clamp score to 0–100 range for display */
+    const clamped = Math.min(Math.max(score, 0), 110);
+    const deg = 180 + (clamped / 100) * 180;
+    const rad = deg * Math.PI / 180;
+    const len = 52;
+    const nx = (cx + len * Math.cos(rad)).toFixed(2);
+    const ny = (cy + len * Math.sin(rad)).toFixed(2);
+    document.getElementById('needle').setAttribute('x2', nx);
+    document.getElementById('needle').setAttribute('y2', ny);
+  }
+</script>
+</body>
+</html>

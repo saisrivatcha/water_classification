@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AquaML — Water Classification</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f6f3;
+  --surface:#ffffff;
+  --surface2:#f0f2ef;
+  --surface3:#e8ebe6;
+  --border:rgba(0,0,0,.09);
+  --border2:rgba(0,0,0,.16);
+  --text:#1a1f18;
+  --text2:#5a6358;
+  --text3:#8e9b8c;
+  --teal:#1D9E75;
+  --teal-l:#E1F5EE;
+  --teal-d:#0F6E56;
+  --blue:#378ADD;
+  --r-md:10px;--r-lg:16px;--r-xl:22px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Fraunces',Georgia,serif;min-height:100vh;padding:0 0 6rem}
+
+/* NAV */
+.nav{background:var(--surface);border-bottom:.5px solid var(--border2);padding:0 2rem;display:flex;align-items:center;height:54px;position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:400;color:var(--text);margin-right:2rem;text-decoration:none}
+.nav-link{height:54px;display:flex;align-items:center;padding:0 14px;font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);text-decoration:none;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
+.nav-link:hover{color:var(--text)}
+.nav-link.active{color:var(--teal);border-bottom-color:var(--teal)}
+
+/* PAGE */
+.page{max-width:900px;margin:0 auto;padding:3rem 1.5rem}
+
+/* HEADER */
+.page-header{text-align:center;margin-bottom:3rem}
+.page-header .eyebrow{font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.14em;color:var(--teal);margin-bottom:14px}
+.page-header h1{font-size:38px;font-weight:300;letter-spacing:-.02em;line-height:1.15;color:var(--text);margin-bottom:12px}
+.page-header h1 em{font-style:italic;color:var(--teal)}
+.page-header p{font-size:14px;font-family:'DM Mono',monospace;color:var(--text2);line-height:1.7}
+
+/* WATER TYPE PILLS */
+.types-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:3rem}
+.type-pill{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 14px;border-radius:30px;
+  border:.5px solid var(--border2);
+  background:var(--surface2);
+  font-size:12px;font-family:'DM Mono',monospace;
+  color:var(--text2);transition:border-color .2s,color .2s,background .2s;
+  cursor:default;
+}
+.type-pill .pill-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.type-pill:hover{border-color:rgba(255,255,255,.22);color:var(--text);background:var(--surface3)}
+
+/* UPLOAD ZONE */
+.upload-wrap{margin-bottom:2.5rem}
+.drop-zone{
+  border:1.5px dashed rgba(255,255,255,.15);
+  border-radius:var(--r-xl);
+  padding:3.5rem 2rem;
+  text-align:center;
+  background:var(--surface);
+  cursor:pointer;
+  transition:border-color .2s,background .2s;
+  position:relative;
+  overflow:hidden;
+}
+.drop-zone::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 120%, rgba(29,158,117,.04) 0%, transparent 70%);
+  pointer-events:none;
+}
+.drop-zone:hover,.drop-zone.drag{
+  border-color:var(--teal);
+  background:rgba(29,158,117,.04);
+}
+.drop-zone input{display:none}
+
+.upload-icon{margin:0 auto 18px;width:56px;height:56px;border-radius:50%;background:var(--surface2);border:.5px solid var(--border2);display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s}
+.drop-zone:hover .upload-icon,.drop-zone.drag .upload-icon{background:var(--teal-l);border-color:var(--teal)}
+
+.drop-title{font-size:18px;font-weight:300;color:var(--text);margin-bottom:8px}
+.drop-sub{font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);margin-bottom:18px}
+.drop-btn{
+  display:inline-block;padding:9px 24px;
+  background:var(--teal);color:#fff;
+  border-radius:var(--r-md);font-family:'DM Mono',monospace;
+  font-size:13px;border:none;cursor:pointer;
+  transition:background .15s,transform .1s;
+}
+.drop-btn:hover{background:var(--teal-d)}
+.drop-btn:active{transform:scale(.98)}
+.drop-formats{margin-top:14px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text3)}
+
+/* PREVIEW */
+.preview-section{display:none;margin-bottom:2.5rem}
+.preview-section.show{display:block;animation:fadeUp .4s cubic-bezier(.22,1,.36,1)}
+
+.preview-card{
+  background:var(--surface);border:.5px solid var(--border2);
+  border-radius:var(--r-xl);overflow:hidden;
+}
+.preview-top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:.5px solid var(--border);
+}
+.preview-filename{font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)}
+.preview-size{font-size:12px;font-family:'DM Mono',monospace;color:var(--text3)}
+.clear-btn{
+  padding:5px 14px;background:transparent;
+  border:.5px solid var(--border2);border-radius:var(--r-md);
+  font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);
+  cursor:pointer;transition:border-color .15s,color .15s;
+}
+.clear-btn:hover{border-color:rgba(226,75,74,.6);color:#E24B4A}
+
+.preview-img-wrap{
+  position:relative;width:100%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface2);min-height:320px;max-height:480px;overflow:hidden;
+}
+.preview-img{max-width:100%;max-height:480px;object-fit:contain;display:block}
+
+/* CAMERA */
+.camera-section{display:none;margin-bottom:2.5rem;text-align:center;}
+.camera-section.show{display:block;animation:fadeUp .4s cubic-bezier(.22,1,.36,1)}
+.video-wrap{position:relative;width:100%;background:#000;border-radius:var(--r-xl);overflow:hidden;margin-bottom:15px;min-height:300px;}
+#videoFeed{width:100%;display:block;max-height:480px;object-fit:cover;}
+.camera-controls{display:flex;gap:10px;justify-content:center;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="Home_page.html">
+    <svg width="22" height="26" viewBox="0 0 48 56" fill="none"><path d="M24 4C24 4 6 22 6 34A18 18 0 0 0 42 34C42 22 24 4 24 4Z" fill="#1D9E75" opacity=".9"/></svg>
+    AquaML
+  </a>
+  <a class="nav-link" href="Home_page.html">WQI Calculator</a>
+  <a class="nav-link" href="Prediction_page.html">Forecast</a>
+  <a class="nav-link" href="anomoly_detection.html">Anomaly Detection</a>
+  <a class="nav-link active" href="Classification.html">Classification</a>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="eyebrow">ML · Image Classification</div>
+    <h1>Identify your <em>water type</em></h1>
+    <p>Upload a water image — the model classifies it into one of 8 categories<br/>using a trained convolutional neural network.</p>
+  </div>
+
+  <!-- Water type pills -->
+  <div class="types-row">
+    <div class="type-pill"><div class="pill-dot" style="background:#58a6ff"></div>Clean Water</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#8b6914"></div>Muddy Water</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#1D9E75"></div>River Water</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#8b4513"></div>Polluted Water</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#6e5494"></div>Industrial Waste</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#2d7d46"></div>Fish Pond</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#0077b6"></div>Sea Water</div>
+    <div class="type-pill"><div class="pill-dot" style="background:#457b9d"></div>Lake Water</div>
+  </div>
+
+  <!-- Upload zone -->
+  <div class="upload-wrap" id="uploadWrap">
+    <div class="drop-zone" id="dropZone"
+         onclick="document.getElementById('imgInput').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="handleDrop(event)">
+      <div class="upload-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 16V8M8 12l4-4 4 4" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 16v1a4 4 0 0 0 4 4h10a4 4 0 0 0 4-4v-1" stroke="#8b949e" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="drop-title">Drop your water image here</div>
+      <div class="drop-sub">or browse from your device</div>
+      <button class="drop-btn" onclick="event.stopPropagation();document.getElementById('imgInput').click()">Choose image</button>
+      
+      <div style="margin-top: 15px; margin-bottom: 15px;">
+        <button class="drop-btn" style="background:var(--surface2); color:var(--text); border:.5px solid var(--border2); display:inline-flex; align-items:center; gap:8px;" onclick="event.stopPropagation();openCamera()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          Open Camera
+        </button>
+      </div>
+
+      <div class="drop-formats">Supports JPG · PNG · WEBP · BMP</div>
+      <input type="file" id="imgInput" accept="image/*" onchange="handleFile(this.files[0])"/>
+    </div>
+  </div>
+
+  <!-- Camera -->
+  <div class="camera-section" id="cameraSection">
+    <div class="video-wrap">
+      <video id="videoFeed" autoplay playsinline></video>
+    </div>
+    <div class="camera-controls">
+      <button class="drop-btn" onclick="captureImage()">Capture & Predict</button>
+      <button class="drop-btn" style="background:var(--surface2); color:var(--text); border:.5px solid var(--border2);" onclick="closeCamera()">Cancel</button>
+    </div>
+    <canvas id="canvas" style="display:none;"></canvas>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-section" id="previewSection">
+    <div class="preview-card">
+      <div class="preview-top">
+        <div>
+          <div class="preview-filename" id="previewFilename">image.jpg</div>
+          <div class="preview-size" id="previewSize">—</div>
+        </div>
+        <button class="clear-btn" onclick="clearImage()">Remove</button>
+      </div>
+      <div class="preview-img-wrap">
+        <img id="previewImg" class="preview-img" src="" alt="Preview"/>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+
+<script>
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) handleFile(f);
+  else alert('Please drop a valid image file.');
+}
+
+function handleFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewFilename').textContent = file.name;
+    document.getElementById('previewSize').textContent =
+      (file.size/1024).toFixed(1)+' KB · '+file.type;
+    document.getElementById('uploadWrap').style.display = 'none';
+    document.getElementById('previewSection').classList.add('show');
+    
+    predictImage(file);
+  };
+  reader.readAsDataURL(file);
+}
+
+function predictImage(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  let resDiv = document.getElementById("predictionResult");
+  if (!resDiv) {
+    resDiv = document.createElement("div");
+    resDiv.id = "predictionResult";
+    resDiv.style.marginTop = "20px";
+    resDiv.style.padding = "20px";
+    resDiv.style.borderRadius = "var(--r-md)";
+    resDiv.style.background = "var(--surface2)";
+    resDiv.style.fontFamily = "'DM Mono', monospace";
+    resDiv.style.textAlign = "center";
+    document.querySelector(".preview-card").appendChild(resDiv);
+  }
+  
+  // Need to add some spinner CSS if missing, but we can reuse some simple text loading
+  resDiv.innerHTML = `<div style="font-size:14px; color:var(--text2)">
+    Analyzing image...
+  </div>`;
+  
+  fetch('/predict', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) {
+      resDiv.innerHTML = `<span style="color:var(--red)">Error: ${data.error}</span>`;
+    } else {
+      let top3Html = '';
+      if (data.top3 && data.top3.length > 0) {
+        top3Html = `<div style="font-size:12px; margin-top:10px; color:var(--text2)">
+          Top 3 Predictions:<br/>
+          ${data.top3.map(t => `${t.class} (${t.confidence})`).join('<br/>')}
+        </div>`;
+      }
+      resDiv.innerHTML = `
+        <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text3); margin-bottom:8px">Prediction Result</div>
+        <div style="font-size:24px; color:var(--teal); font-weight:500; font-family:'Fraunces',serif">${data.result}</div>
+        ${top3Html}
+      `;
+    }
+  })
+  .catch(err => {
+    resDiv.innerHTML = `<span style="color:var(--red)">Failed to reach server. Error: ${err.message}</span>`;
+  });
+}
+
+function clearImage(){
+  document.getElementById('imgInput').value = '';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('uploadWrap').style.display = 'block';
+  document.getElementById('previewSection').classList.remove('show');
+  
+  const resDiv = document.getElementById("predictionResult");
+  if (resDiv) {
+      resDiv.remove();
+  }
+}
+
+let videoStream = null;
+
+function openCamera() {
+  document.getElementById('uploadWrap').style.display = 'none';
+  document.getElementById('previewSection').classList.remove('show');
+  document.getElementById('cameraSection').classList.add('show');
+  
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      videoStream = stream;
+      document.getElementById('videoFeed').srcObject = stream;
+    })
+    .catch(err => {
+      alert("Error accessing camera: " + err.message);
+      closeCamera();
+    });
+}
+
+function closeCamera() {
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+    videoStream = null;
+  }
+  document.getElementById('cameraSection').classList.remove('show');
+  document.getElementById('uploadWrap').style.display = 'block';
+}
+
+function captureImage() {
+  const video = document.getElementById('videoFeed');
+  const canvas = document.getElementById('canvas');
+  if (!videoStream || video.videoWidth === 0) return;
+  
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  canvas.toBlob(blob => {
+    const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+    closeCamera();
+    handleFile(file);
+  }, "image/jpeg", 0.9);
+}
+</script>
+</body>
+</html>

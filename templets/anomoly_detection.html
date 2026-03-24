@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AquaML — Anomaly Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f6f3;--surface:#fff;--surface2:#f0f2ef;
+  --border:rgba(0,0,0,.09);--border2:rgba(0,0,0,.16);
+  --text:#1a1f18;--text2:#5a6358;--text3:#8e9b8c;
+  --teal:#1D9E75;--teal-d:#0F6E56;--teal-l:#E1F5EE;
+  --amber:#EF9F27;--amber-l:#FAEEDA;
+  --red:#E24B4A;--red-l:#FCEBEB;
+  --r-md:10px;--r-lg:16px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Fraunces',Georgia,serif;min-height:100vh;padding:0 0 6rem}
+
+/* NAV */
+.nav{background:var(--surface);border-bottom:.5px solid var(--border2);padding:0 2rem;display:flex;align-items:center;height:54px;position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:400;color:var(--text);margin-right:2rem;text-decoration:none}
+.nav-link{height:54px;display:flex;align-items:center;padding:0 14px;font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);text-decoration:none;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
+.nav-link:hover{color:var(--text)}
+.nav-link.active{color:var(--red);border-bottom-color:var(--red)}
+
+/* PAGE */
+.page{max-width:960px;margin:0 auto;padding:2.5rem 1.5rem}
+.page-header{margin-bottom:1.75rem}
+.page-header h1{font-size:26px;font-weight:400;letter-spacing:-.02em}
+.page-header p{font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);margin-top:5px}
+
+/* BANNER */
+.banner{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:var(--r-md);font-size:13px;font-family:'DM Mono',monospace;margin-bottom:1.75rem;border:.5px solid}
+.banner.loading{background:var(--amber-l);border-color:var(--amber);color:#633806}
+.banner.success{background:var(--teal-l);border-color:var(--teal);color:var(--teal-d)}
+.banner.error{background:var(--red-l);border-color:var(--red);color:#791F1F}
+.spinner{width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* FORMULA CARD */
+.formula-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem;margin-bottom:1.75rem}
+.formula-title{font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:1rem}
+.formula-body{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+.formula-eq{font-size:22px;font-family:'DM Mono',monospace;color:var(--text);font-weight:500;background:var(--surface2);padding:12px 20px;border-radius:var(--r-md);border-left:3px solid var(--red)}
+.formula-desc{font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);line-height:1.8}
+.formula-desc span{display:block}
+
+/* CONTROLS */
+.ctrl-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem;margin-bottom:1.75rem}
+.ctrl-title{font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:1.25rem}
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end}
+@media(max-width:640px){.ctrl-grid{grid-template-columns:1fr 1fr}}
+.ctrl label{display:block;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.ctrl select,.ctrl input[type=number]{
+  width:100%;padding:10px 12px;background:var(--surface2);
+  border:.5px solid var(--border2);border-radius:var(--r-md);
+  font-family:'DM Mono',monospace;font-size:14px;color:var(--text);
+  outline:none;transition:border-color .15s,background .15s;cursor:pointer}
+.ctrl select:focus,.ctrl input[type=number]:focus{border-color:var(--red);background:#fff}
+.run-btn{padding:11px 26px;background:var(--red);color:#fff;border:none;border-radius:var(--r-md);font-family:'Fraunces',serif;font-size:16px;cursor:pointer;white-space:nowrap;transition:background .15s,transform .1s;box-shadow:0 3px 14px rgba(226,75,74,.25)}
+.run-btn:hover{background:#A32D2D}
+.run-btn:active{transform:scale(.98)}
+.run-btn:disabled{background:var(--text3);box-shadow:none;cursor:not-allowed}
+
+/* SUMMARY CARDS */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.75rem}
+@media(max-width:520px){.summary-grid{grid-template-columns:repeat(2,1fr)}}
+.sum-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.sum-lbl{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.sum-val{font-size:26px;font-weight:400;line-height:1;color:var(--text)}
+.sum-sub{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);margin-top:4px}
+
+/* CHART */
+.chart-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem 1.5rem 1.25rem;margin-bottom:1.75rem}
+.chart-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.chart-ttl{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.legend{display:flex;gap:18px;margin-bottom:14px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:7px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text2)}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+.leg-line{width:22px;height:2.5px;border-radius:2px}
+.chart-wrap{position:relative;width:100%;height:300px}
+
+/* THRESHOLD BADGE */
+.thresh-badge{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:20px;background:var(--red-l);color:#791F1F}
+
+/* TABLE */
+.table-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem;overflow-x:auto;margin-bottom:1.75rem}
+.table-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.table-ttl{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+
+table{width:100%;border-collapse:collapse;font-size:13px;font-family:'DM Mono',monospace}
+th{text-align:left;padding:7px 14px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);border-bottom:1px solid var(--border2);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--text)}
+td{padding:9px 14px;border-bottom:.5px solid var(--border);color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr.anomaly td{background:#FFF5F5}
+tr.anomaly:hover td{background:#FFECEC}
+tr:not(.anomaly):hover td{background:var(--surface2)}
+.tag{display:inline-block;font-size:10px;padding:2px 9px;border-radius:12px;font-family:'DM Mono',monospace;font-weight:500}
+.tag-anom{background:#FCEBEB;color:#791F1F}
+.tag-norm{background:#EAF3DE;color:#3B6D11}
+.tag-warn{background:#FAEEDA;color:#633806}
+.z-high{color:#E24B4A;font-weight:500}
+.z-warn{color:#EF9F27;font-weight:500}
+.z-norm{color:#3B6D11}
+
+/* INSIGHT */
+.insight-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem}
+.insight-title{font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px}
+.insight-list{display:flex;flex-direction:column;gap:11px}
+.insight-row{display:flex;gap:12px;align-items:flex-start}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.itext{font-size:13px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.65}
+
+/* EMPTY */
+.empty{font-size:13px;font-family:'DM Mono',monospace;color:var(--text3);padding:.5rem 0}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fadein{animation:fadeUp .4s cubic-bezier(.22,1,.36,1)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="Home_page.html">
+    <svg width="22" height="26" viewBox="0 0 48 56" fill="none"><path d="M24 4C24 4 6 22 6 34A18 18 0 0 0 42 34C42 22 24 4 24 4Z" fill="#1D9E75" opacity=".9"/></svg>
+    AquaML
+  </a>
+  <a class="nav-link" href="Home_page.html">WQI Calculator</a>
+  <a class="nav-link" href="Prediction_page.html">Forecast</a>
+  <a class="nav-link active" href="anomoly_detection.html">Anomaly Detection</a>
+  <a class="nav-link" href="Classification.html">Classification</a>
+</nav>
+
+<div class="page">
+
+  <div class="page-header">
+    <h1>Anomaly Detection</h1>
+    <p>Z-score method · flags values deviating beyond threshold · Dataset.csv</p>
+  </div>
+
+  <!-- Banner -->
+  <div class="banner loading" id="banner">
+    <div class="spinner"></div>
+    <span id="bannerText">Loading Dataset.csv…</span>
+  </div>
+
+  <!-- Formula -->
+  <div class="formula-card">
+    <div class="formula-title">Z-score formula</div>
+    <div class="formula-body">
+      <div class="formula-eq">Z = (X − μ) / σ</div>
+      <div class="formula-desc">
+        <span><strong>X</strong> = observed value</span>
+        <span><strong>μ</strong> = mean of the parameter</span>
+        <span><strong>σ</strong> = standard deviation</span>
+        <span><strong>|Z| &gt; threshold</strong> = anomaly flagged</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="ctrl-card">
+    <div class="ctrl-title">Detection settings</div>
+    <div class="ctrl-grid">
+      <div class="ctrl">
+        <label>Parameter</label>
+        <select id="selParam"><option value="">Loading…</option></select>
+      </div>
+      <div class="ctrl">
+        <label>Z-score threshold</label>
+        <input type="number" id="threshold" value="2.5" min="1" max="5" step="0.1"/>
+      </div>
+      <div class="ctrl">
+        <label>Show top N anomalies</label>
+        <input type="number" id="topN" value="20" min="5" max="200" step="5"/>
+      </div>
+      <button class="run-btn" id="runBtn" onclick="detect()" disabled>Detect →</button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="sum-card">
+      <div class="sum-lbl">Total rows</div>
+      <div class="sum-val" id="sTotalRows">—</div>
+      <div class="sum-sub">in dataset</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-lbl">Anomalies found</div>
+      <div class="sum-val" id="sAnomalies" style="color:var(--red)">—</div>
+      <div class="sum-sub" id="sAnomalyPct">of total</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-lbl">Mean (μ)</div>
+      <div class="sum-val" id="sMean">—</div>
+      <div class="sum-sub" id="sMeanParam">parameter</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-lbl">Std Dev (σ)</div>
+      <div class="sum-val" id="sStd">—</div>
+      <div class="sum-sub">spread of values</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <div class="chart-top">
+      <div class="chart-ttl" id="chartTitle">Z-score chart — run detection</div>
+      <div class="thresh-badge" id="threshBadge">threshold ±2.5</div>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-line" style="background:#378ADD"></div>Z-score</div>
+      <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div>Anomaly</div>
+      <div class="leg"><div class="leg-line" style="background:#E24B4A;border-top:2px dashed #E24B4A;height:0;width:22px"></div>Threshold</div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartZ"></canvas></div>
+  </div>
+
+  <!-- Anomaly table -->
+  <div class="table-card">
+    <div class="table-top">
+      <div class="table-ttl">Anomalous rows — <span id="anomCount">0</span> detected</div>
+    </div>
+    <div id="anomalyTable"><p class="empty">Run detection to see anomalies</p></div>
+  </div>
+
+  <!-- Insights -->
+  <div class="insight-card">
+    <div class="insight-title">Insights &amp; summary</div>
+    <div class="insight-list" id="insightList">
+      <div class="insight-row">
+        <div class="dot" style="background:var(--text3)"></div>
+        <div class="itext">Select a parameter, set a threshold, and click Detect.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CSV_PATH = 'water_quality_with_timestamp.csv';
+
+const COLORS = {
+  ph:'#1D9E75', turbidity:'#378ADD',
+  conductivity:'#EF9F27', dissolved_oxygen:'#7F77DD', temperature:'#E24B4A'
+};
+
+let rows=[], numCols=[], zChart=null, allAnomalyRows=[];
+
+/* ══ AUTO LOAD ══ */
+window.addEventListener('DOMContentLoaded',()=>{
+  fetch(CSV_PATH)
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+    .then(parseCSV)
+    .catch(err=>setBanner('error',
+      'Cannot load Dataset.csv: '+err.message+
+      ' — open via Live Server in VS Code.'));
+});
+
+/* ══ SET BANNER ══ */
+function setBanner(type,msg){
+  const b=document.getElementById('banner');
+  b.className='banner '+type;
+  const icon={
+    loading:'<div class="spinner"></div>',
+    success:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 4" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    error:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="#E24B4A" stroke-width="1.5" stroke-linecap="round"/></svg>'
+  }[type]||'';
+  b.innerHTML=`${icon}<span>${msg}</span>`;
+}
+
+/* ══ PARSE CSV (Just for dropdown population) ══ */
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const cols=lines[0].split(',').map(c=>c.trim().replace(/"/g,''));
+  const firstRow = lines[1].split(',');
+  numCols = cols.filter((c, j) => !isNaN(parseFloat(firstRow[j])) && !c.toLowerCase().includes('time') && !c.toLowerCase().includes('label'));
+  rows = Array(lines.length-1).fill({}); // Dummy length
+  
+  document.getElementById('selParam').innerHTML=
+    `<option value="">— Select parameter —</option>`+
+    numCols.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  setBanner('success',`Ready. Target parameters: ${numCols.join(', ')}`);
+  document.getElementById('runBtn').disabled=false;
+  document.getElementById('sTotalRows').textContent=(lines.length-1);
+}
+
+/* ══ MAIN DETECT ══ */
+async function detect(){
+  const param     = document.getElementById('selParam').value;
+  const threshold = parseFloat(document.getElementById('threshold').value)||2.5;
+  const topN      = parseInt(document.getElementById('topN').value)||20;
+
+  if(!param){ alert('Please select a parameter.'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = "Detecting...";
+
+  try {
+    const res = await fetch('/api/anomaly_batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parameter: param, threshold: threshold })
+    });
+    
+    if(!res.ok) {
+      const e = await res.json();
+      throw new Error(e.error || 'Server error');
+    }
+    
+    const data = await res.json();
+    
+    const mu = data.mu;
+    const sigma = data.sigma;
+    const scored = data.scored;
+    const anomalies = data.anomalies;
+    const vals = scored.map(r=>r.value);
+    
+    allAnomalyRows = anomalies;
+
+    /* update summary */
+    const totalRowsCount = scored.length;
+    const pct = ((anomalies.length / totalRowsCount) * 100).toFixed(1);
+    
+    document.getElementById('sAnomalies').textContent  = anomalies.length;
+    document.getElementById('sAnomalyPct').textContent = `${pct}% of ${totalRowsCount} rows`;
+    document.getElementById('sMean').textContent       = mu.toFixed(3);
+    document.getElementById('sStd').textContent        = sigma.toFixed(3);
+    document.getElementById('sMeanParam').textContent  = param;
+    document.getElementById('anomCount').textContent   = anomalies.length;
+    document.getElementById('threshBadge').textContent = `threshold ±${threshold}`;
+    document.getElementById('chartTitle').textContent  =
+      `Z-score chart — ${param} (${anomalies.length} anomalies flagged)`;
+
+    drawChart(scored, threshold, param);
+    buildTable(anomalies.slice(0, topN), param, threshold);
+    
+    // We pass totalRowsCount as rows.length logic
+    window.tempTotalRows = totalRowsCount;
+    buildInsights(param, mu, sigma, threshold, anomalies, vals);
+
+  } catch(err) {
+    alert("Connection error: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Detect →";
+  }
+}
+
+/* ══ CHART ══ */
+function drawChart(scored, threshold, param){
+  if(zChart){ zChart.destroy(); }
+
+  /* sample to max 400 pts for performance */
+  const step = Math.ceil(scored.length/400);
+  const sampled = scored.filter((_,i)=>i%step===0);
+
+  const labels    = sampled.map(r=>`Row ${r.rowNum}`);
+  const zValues   = sampled.map(r=>+r.z.toFixed(3));
+  const anomColors= sampled.map(r=>
+    Math.abs(r.z)>threshold ? '#E24B4A' : 'rgba(55,138,221,0.35)'
+  );
+  const anomRadius= sampled.map(r=>Math.abs(r.z)>threshold ? 5 : 2);
+
+  /* threshold lines */
+  const upperThresh = sampled.map(()=>threshold);
+  const lowerThresh = sampled.map(()=>-threshold);
+
+  zChart=new Chart(document.getElementById('chartZ'),{
+    type:'bar',
+    data:{labels, datasets:[
+      {
+        label:'Z-score',
+        data:zValues,
+        backgroundColor:anomColors,
+        borderColor:anomColors,
+        borderWidth:1,
+        borderRadius:2,
+      },
+      {
+        label:'Upper threshold',
+        data:upperThresh,
+        type:'line', borderColor:'#E24B4A',
+        borderWidth:1.5, borderDash:[6,4],
+        pointRadius:0, fill:false, tension:0
+      },
+      {
+        label:'Lower threshold',
+        data:lowerThresh,
+        type:'line', borderColor:'#E24B4A',
+        borderWidth:1.5, borderDash:[6,4],
+        pointRadius:0, fill:false, tension:0
+      }
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:ctx=>{
+              if(ctx.datasetIndex>0) return null;
+              const isAnom=Math.abs(ctx.raw)>threshold;
+              return `Z = ${ctx.raw} ${isAnom?'⚠ ANOMALY':''}`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{maxTicksLimit:14,font:{size:10},autoSkip:true},grid:{display:false}},
+        y:{
+          title:{display:true,text:'Z-score',font:{size:11}},
+          ticks:{font:{size:10}},
+          grid:{color:'rgba(0,0,0,.04)'}
+        }
+      }
+    }
+  });
+}
+
+/* ══ TABLE ══ */
+let _tableData=[], _sortCol='z', _sortDir=-1;
+
+function buildTable(anomalies, param, threshold){
+  _tableData = anomalies;
+  renderTable(anomalies, param, threshold);
+}
+
+function renderTable(data, param, threshold){
+  if(!data.length){
+    document.getElementById('anomalyTable').innerHTML=
+      `<p class="empty">No anomalies found with threshold ±${threshold}. Try lowering the threshold.</p>`;
+    return;
+  }
+
+  const param_=document.getElementById('selParam').value||param;
+  const thresh_=parseFloat(document.getElementById('threshold').value)||threshold;
+
+  let html=`<table>
+    <thead><tr>
+      <th>Row #</th>
+      <th>Value</th>
+      <th>Z-score</th>
+      <th>|Z|</th>
+      <th>Severity</th>
+      <th>Direction</th>
+    </tr></thead><tbody>`;
+
+  data.forEach(r=>{
+    const absZ=Math.abs(r.z).toFixed(3);
+    const zFmt=r.z.toFixed(3);
+    const zClass=Math.abs(r.z)>3?'z-high':Math.abs(r.z)>2?'z-warn':'z-norm';
+
+    let severity='<span class="tag tag-warn">Mild</span>';
+    if(Math.abs(r.z)>4)      severity='<span class="tag tag-anom">Extreme</span>';
+    else if(Math.abs(r.z)>3) severity='<span class="tag tag-anom">High</span>';
+
+    const dir=r.z>0
+      ?`<span style="color:#E24B4A">▲ Above mean</span>`
+      :`<span style="color:#378ADD">▼ Below mean</span>`;
+
+    html+=`<tr class="anomaly">
+      <td>${r.rowNum}</td>
+      <td><strong>${r.value.toFixed(4)}</strong></td>
+      <td class="${zClass}">${zFmt}</td>
+      <td>${absZ}</td>
+      <td>${severity}</td>
+      <td>${dir}</td>
+    </tr>`;
+  });
+
+  html+='</tbody></table>';
+  const el=document.getElementById('anomalyTable');
+  el.innerHTML=html;
+  el.classList.remove('fadein');
+  void el.offsetWidth;
+  el.classList.add('fadein');
+}
+
+
+
+/* ══ INSIGHTS ══ */
+function buildInsights(param, mu, sigma, threshold, anomalies, vals){
+  const tRows = window.tempTotalRows || 1000;
+  const pct=((anomalies.length/tRows)*100).toFixed(1);
+  const extreme=anomalies.filter(r=>Math.abs(r.z)>4);
+  const high=anomalies.filter(r=>Math.abs(r.z)>3&&Math.abs(r.z)<=4);
+  const above=anomalies.filter(r=>r.z>0);
+  const below=anomalies.filter(r=>r.z<0);
+  const maxZ=anomalies.length?anomalies[0]:null;
+
+  const items=[
+    {c:'#1D9E75',
+     t:`${tRows} rows analysed in Python backend. Mean ${param}: ${mu.toFixed(3)} · Std dev: ${sigma.toFixed(3)} · Threshold: ±${threshold}σ`},
+    {c:'#E24B4A',
+     t:`${anomalies.length} anomalies detected (${pct}% of data). ${extreme.length} extreme (|Z|>4), ${high.length} high (|Z|>3), ${anomalies.length-extreme.length-high.length} mild.`},
+    {c:'#378ADD',
+     t:`Direction: ${above.length} values above mean (high), ${below.length} values below mean (low).`},
+  ];
+
+  if(maxZ)
+    items.push({c:'#E24B4A',
+      t:`Worst anomaly: Row ${maxZ.rowNum} — ${param} = ${maxZ.value.toFixed(4)}, Z = ${maxZ.z.toFixed(3)} (${Math.abs(maxZ.z).toFixed(1)}σ from mean).`});
+
+
+
+  document.getElementById('insightList').innerHTML=items.map(it=>`
+    <div class="insight-row">
+      <div class="dot" style="background:${it.c}"></div>
+      <div class="itext">${it.t}</div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

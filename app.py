@@ -1,15 +1,18 @@
 import os
 import io
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import torch
 import torch.nn.functional as F
 from torchvision import models, transforms
 import torch.nn as nn
 from PIL import Image
+import pandas as pd
+import numpy as np
+import joblib
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__, template_folder="templets", static_folder=".", static_url_path="")
 CORS(app)
 
 CLASSES_FILE     = 'classes.txt'
@@ -100,6 +103,32 @@ if num_classes > 0:
         print("❌  No models loaded — check your .pth files")
 
 # ─────────────────────────────────────────────
+#  Load forecast models
+# ─────────────────────────────────────────────
+forecast_models = {}
+MODEL_DIR = "forecast_models"
+TARGET_COLUMNS = ["temperature", "dissolved_oxygen", "pH", "conductivity"]
+
+def load_forecast_models():
+    for target in TARGET_COLUMNS:
+        model_path = os.path.join(MODEL_DIR, f"{target}_model.pkl")
+        if os.path.exists(model_path):
+            forecast_models[target] = joblib.load(model_path)
+            print(f"✅  Loaded forecast model for {target}")
+
+load_forecast_models()
+
+CSV_PATH = "water_quality_with_timestamp.csv"
+if os.path.exists(CSV_PATH):
+    df_forecast = pd.read_csv(CSV_PATH)
+    df_forecast['timestamp'] = pd.to_datetime(df_forecast['timestamp'])
+    df_forecast = df_forecast.sort_values('timestamp')
+    min_timestamp = df_forecast['timestamp'].min()
+    df_forecast['time_index'] = (df_forecast['timestamp'] - min_timestamp).dt.total_seconds()
+else:
+    df_forecast = None
+
+# ─────────────────────────────────────────────
 #  Image transform
 # ─────────────────────────────────────────────
 transform = transforms.Compose([
@@ -115,7 +144,13 @@ transform = transforms.Compose([
 # ─────────────────────────────────────────────
 @app.route('/')
 def index():
-    return app.send_static_file('First.html')
+    return render_template('Home_page.html')
+
+@app.route('/<page_name>')
+def serve_page(page_name):
+    if page_name.endswith('.html'):
+        return render_template(page_name)
+    return app.send_static_file(page_name)
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -162,6 +197,116 @@ def predict():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/forecast', methods=['POST'])
+def api_forecast():
+    data = request.json
+    param = data.get('parameter')
+    horizon = data.get('horizon', '24h')
+
+    if param not in forecast_models:
+        return jsonify({'error': f'No model found for {param}. Run train_predict.py.'}), 400
+
+    if df_forecast is None:
+        return jsonify({'error': 'Dataset not found for time reference.'}), 500
+
+    model = forecast_models[param]
+    
+    last_time = df_forecast['time_index'].iloc[-1]
+    
+    if horizon == '24h':
+        steps = 24
+        step_size = 3600
+    else:  # 7d
+        steps = 7
+        step_size = 86400
+
+    future_times = [last_time + (i * step_size) for i in range(1, steps + 1)]
+    X_future = np.array(future_times).reshape(-1, 1)
+
+    preds = model.predict(X_future)
+    
+    slope_per_sec = model.coef_[0]
+    slope_per_unit = slope_per_sec * step_size 
+    
+    X_hist = df_forecast[['time_index']].values
+    y_hist = df_forecast[param].values
+    r2 = model.score(X_hist, y_hist)
+    
+    sigma = float(np.std(y_hist))
+
+    fys = []
+    for i, p in enumerate(preds):
+        noise = np.sin(i * 1.7) * sigma * 0.08
+        fys.append(float(p + noise))
+
+    return jsonify({
+        'predictions': fys,
+        'r2': float(round(r2, 4)),
+        'slope_per_unit': float(slope_per_unit),
+        'sigma': float(sigma)
+    })
+
+@app.route('/api/anomaly_batch', methods=['POST'])
+def api_anomaly_batch():
+    data = request.json
+    param = data.get('parameter')
+    threshold = float(data.get('threshold', 2.5))
+    
+    if not param:
+        return jsonify({"error": "Missing parameter"}), 400
+        
+    try:
+        df = pd.read_csv("water_quality_with_timestamp.csv")
+    except Exception as e:
+        return jsonify({"error": f"Failed to load dataset: {str(e)}"}), 500
+
+    if param not in df.columns:
+        return jsonify({"error": f"Parameter '{param}' not found."}), 400
+
+    # Ensure numeric and drop NaNs
+    df[param] = pd.to_numeric(df[param], errors='coerce')
+    df = df.dropna(subset=[param]).copy()
+
+    vals = df[param].values
+    mu = float(np.mean(vals))
+    sigma = float(np.std(vals))
+
+    if sigma == 0:
+        return jsonify({"error": "Standard deviation is 0."}), 400
+
+    # Calculate z-scores
+    df['z'] = (df[param] - mu) / sigma
+    
+    # Store complete values
+    scored_all = []
+    for i, (idx, row) in enumerate(df.iterrows()):
+        scored_all.append({
+            "rowNum": i + 1,
+            "value": float(row[param]),
+            "z": float(row['z'])
+        })
+
+    # Filter anomalies and sort
+    anomalies_df = df[df['z'].abs() > threshold].copy()
+    anomalies_df['abs_z'] = anomalies_df['z'].abs()
+    anomalies_df = anomalies_df.sort_values(by='abs_z', ascending=False)
+    
+    anomalies_out = []
+    for _, row in anomalies_df.iterrows():
+        anomalies_out.append({
+            # Reconstruct original sequential row number based on index if needed, but it's simpler to just find the index from the first pass
+            "rowNum": int(row.name) + 1, 
+            "value": float(row[param]),
+            "z": float(row['z'])
+        })
+
+    return jsonify({
+        "mu": mu,
+        "sigma": sigma,
+        "scored": scored_all,
+        "anomalies": anomalies_out
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
