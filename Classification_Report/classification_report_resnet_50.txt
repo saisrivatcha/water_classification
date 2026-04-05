@@ -1,0 +1,16 @@
+Classification Report for ResNet-50
+=======================================================
+                  precision    recall  f1-score   support
+
+     Clean Water       0.83      1.00      0.91        20
+Industrail water       0.93      0.84      0.88        31
+            Lake       0.93      0.96      0.95        27
+     Muddy Water       0.75      1.00      0.86        18
+        Seawater       0.95      0.88      0.91        24
+        fishpond       0.94      0.94      0.94        16
+   pollutedwater       0.95      0.83      0.88        23
+      riverwater       0.82      0.64      0.72        14
+
+        accuracy                           0.89       173
+       macro avg       0.89      0.89      0.88       173
+    weighted avg       0.90      0.89      0.89       173

@@ -8,6 +8,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
 import copy
 import json
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, classification_report
 
 # ─────────────────────────────────────────────
 #  CONFIGURATION
@@ -132,7 +136,7 @@ MODEL_BUILDERS = {
 # ─────────────────────────────────────────────
 #  TRAIN ONE MODEL
 # ─────────────────────────────────────────────
-def train_single(cfg, num_classes, train_loader, val_loader, device):
+def train_single(cfg, num_classes, train_loader, val_loader, device, class_names):
     name      = cfg['name']
     save_path = cfg['save_path']
     lr        = cfg['lr']
@@ -207,6 +211,44 @@ def train_single(cfg, num_classes, train_loader, val_loader, device):
 
     model.load_state_dict(best_wts)
     print(f"  🏆  Best val accuracy: {best_acc:.4f}")
+
+    # Generate Performance Matrix & Classification Report
+    print(f"  📊  Evaluating Best Model to Generate Metrics...")
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            out = model(inputs)
+            preds = out.argmax(1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            
+    # Confusion Matrix Plot
+    cm = confusion_matrix(all_labels, all_preds)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title(f'Confusion Matrix - {name}')
+    plt.tight_layout()
+    cm_path = f'confusion_matrix_{name.replace("-", "_").lower()}.png'
+    plt.savefig(cm_path)
+    plt.close()
+    
+    # Classification Report
+    cr = classification_report(all_labels, all_preds, labels=range(len(class_names)), target_names=class_names)
+    cr_path = f'classification_report_{name.replace("-", "_").lower()}.txt'
+    with open(cr_path, 'w', encoding='utf-8') as f:
+        f.write(f"Classification Report for {name}\n")
+        f.write("="*55 + "\n")
+        f.write(cr)
+        
+    print(f"    📈  Saved Confusion Matrix → {cm_path}")
+    print(f"    📄  Saved Classification Report → {cr_path}")
+
     return best_acc
 
 # ─────────────────────────────────────────────
@@ -221,7 +263,7 @@ def train_model():
 
     results = {}
     for cfg in MODELS_CONFIG:
-        acc = train_single(cfg, num_classes, train_loader, val_loader, device)
+        acc = train_single(cfg, num_classes, train_loader, val_loader, device, class_names)
         results[cfg['name']] = acc
 
     # Save accuracy-proportional weights for ensemble inference
