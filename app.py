@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision import models, transforms
 import torch.nn as nn
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 import pandas as pd
 import numpy as np
 import joblib
@@ -15,8 +16,8 @@ import joblib
 app = Flask(__name__, template_folder="templets", static_folder=".", static_url_path="")
 CORS(app)
 
-CLASSES_FILE     = 'classes.txt'
-ENSEMBLE_WEIGHTS = 'ensemble_weights.json'
+CLASSES_FILE    = 'classes.txt'
+META_MODEL_FILE = 'meta_model.pkl'
 
 MODELS_CONFIG = [
     {'name': 'EfficientNet-B3',   'path': 'model_efficientnet.pth'},
@@ -66,18 +67,13 @@ BUILDERS = {
 }
 
 # ─────────────────────────────────────────────
-#  Load all models + ensemble weights
+#  Load all base models + meta model
 # ─────────────────────────────────────────────
-loaded_models  = []   # list of (model, weight)
+loaded_models  = []   # list of models
+meta_model     = None
 ensemble_ready = False
 
 if num_classes > 0:
-    # Load per-model weights if available
-    weight_map = {}
-    if os.path.exists(ENSEMBLE_WEIGHTS):
-        with open(ENSEMBLE_WEIGHTS, 'r') as f:
-            weight_map = json.load(f)
-
     for cfg in MODELS_CONFIG:
         if not os.path.exists(cfg['path']):
             print(f"⚠️  Skipping {cfg['name']} — {cfg['path']} not found")
@@ -87,20 +83,23 @@ if num_classes > 0:
             m.load_state_dict(torch.load(cfg['path'], map_location=device, weights_only=True))
             m = m.to(device)
             m.eval()
-            w = weight_map.get(cfg['path'], 1.0)
-            loaded_models.append((m, w))
-            print(f"✅  Loaded {cfg['name']}  (weight={w:.4f})")
+            loaded_models.append(m)
+            print(f"✅  Loaded {cfg['name']}")
         except Exception as e:
             print(f"❌  Failed to load {cfg['name']}: {e}")
 
-    if loaded_models:
-        # Normalise weights
-        total = sum(w for _, w in loaded_models)
-        loaded_models = [(m, w / total) for m, w in loaded_models]
+    if os.path.exists(META_MODEL_FILE):
+        try:
+            meta_model = joblib.load(META_MODEL_FILE)
+            print(f"✅  Loaded Meta-Model ({META_MODEL_FILE})")
+        except Exception as e:
+            print(f"❌  Failed to load Meta-Model: {e}")
+
+    if len(loaded_models) == len(MODELS_CONFIG) and meta_model is not None:
         ensemble_ready = True
-        print(f"\n🎯  Ensemble ready with {len(loaded_models)} model(s)")
+        print(f"\n🎯  Stacking Ensemble ready with 3 base models + meta-model")
     else:
-        print("❌  No models loaded — check your .pth files")
+        print("❌  Incomplete ensemble — check your .pth files and meta_model.pkl")
 
 # ─────────────────────────────────────────────
 #  Load forecast models
@@ -168,32 +167,49 @@ def predict():
         pil_image    = Image.open(io.BytesIO(file.read())).convert('RGB')
         input_tensor = transform(pil_image).unsqueeze(0).to(device)
 
-        # Weighted average of softmax probabilities across all models
-        avg_probs = None
+        # Extract features (probabilities) from base models
+        batch_probs = []
         with torch.no_grad():
-            for model, weight in loaded_models:
+            for model in loaded_models:
                 probs = F.softmax(model(input_tensor), dim=1)
-                if avg_probs is None:
-                    avg_probs = probs * weight
-                else:
-                    avg_probs += probs * weight
+                batch_probs.append(probs.cpu().numpy())
+                
+        # Concatenate into (1, 3 * num_classes) feature array
+        X_test = np.concatenate(batch_probs, axis=1)
 
-        confidence, predicted_idx = torch.max(avg_probs, 1)
+        # Meta-Model prediction
+        meta_probs = meta_model.predict_proba(X_test)[0]
+        meta_probs_tensor = torch.tensor(meta_probs).unsqueeze(0)
+        
+        confidence, predicted_idx = torch.max(meta_probs_tensor, 1)
+        conf_score = confidence.item()
+
+        # Gibberish / Out-of-Distribution Rejection Threshold
+        CONFIDENCE_THRESHOLD = 0.65
+        if conf_score < CONFIDENCE_THRESHOLD:
+            return jsonify({
+                'result': f"Not a recognized water type (Conf: {conf_score*100:.1f}%)",
+                'top3': [],
+                'models_used': len(loaded_models),
+                'error': 'Image does not match known water classes with high enough confidence.'
+            })
+
         predicted_class = class_names[predicted_idx.item()]
-        conf_score      = confidence.item() * 100
+        conf_score_pct  = conf_score * 100
 
         # Top-3 predictions
-        top3_probs, top3_idx = torch.topk(avg_probs, min(3, num_classes), dim=1)
+        top3_probs, top3_idx = torch.topk(meta_probs_tensor, min(3, num_classes), dim=1)
         top3 = [
             {'class': class_names[i.item()], 'confidence': f"{p.item()*100:.1f}%"}
             for p, i in zip(top3_probs[0], top3_idx[0])
         ]
 
         return jsonify({
-            'result':      f"{predicted_class} ({conf_score:.1f}%)",
+            'result':      f"{predicted_class} ({conf_score_pct:.1f}%)",
             'top3':        top3,
             'models_used': len(loaded_models),
         })
+
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

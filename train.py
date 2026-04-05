@@ -1,4 +1,6 @@
 import os
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,6 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.linear_model import LogisticRegression
+import joblib
 
 # ─────────────────────────────────────────────
 #  CONFIGURATION
@@ -266,20 +270,56 @@ def train_model():
         acc = train_single(cfg, num_classes, train_loader, val_loader, device, class_names)
         results[cfg['name']] = acc
 
-    # Save accuracy-proportional weights for ensemble inference
-    total   = sum(results.values())
-    weights = {cfg['save_path']: round(results[cfg['name']] / total, 4) for cfg in MODELS_CONFIG}
+    print(f"\n{'='*55}")
+    print("  Training Meta-Model (Stacking)")
+    print(f"{'='*55}")
 
-    with open('ensemble_weights.json', 'w') as f:
-        json.dump(weights, f, indent=2)
+    # Load all 3 best models
+    loaded_models = []
+    for cfg in MODELS_CONFIG:
+        m = MODEL_BUILDERS[cfg['name']](num_classes).to(device)
+        m.load_state_dict(torch.load(cfg['save_path'], weights_only=True))
+        m.eval()
+        loaded_models.append(m)
+
+    # Extract probabilities on val_loader
+    X_meta = []
+    y_meta = []
+    
+    print("  Extracting base model predictions on Validation Set...")
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs = inputs.to(device)
+            # Get probs from each model
+            batch_probs = []
+            for m in loaded_models:
+                probs = torch.nn.functional.softmax(m(inputs), dim=1)
+                batch_probs.append(probs.cpu().numpy())
+            
+            # Concatenate along dim=1 -> (batch_size, 3 * num_classes)
+            concat_probs = np.concatenate(batch_probs, axis=1)
+            X_meta.extend(concat_probs)
+            y_meta.extend(labels.numpy())
+
+    X_meta = np.array(X_meta)
+    y_meta = np.array(y_meta)
+
+    print("  Fitting Logistic Regression Meta-Model...")
+    meta_model = LogisticRegression(max_iter=1000)
+    meta_model.fit(X_meta, y_meta)
+    
+    joblib.dump(meta_model, 'meta_model.pkl')
+    val_acc_meta = meta_model.score(X_meta, y_meta)
+    print(f"    💾  Saved → meta_model.pkl  (val_acc={val_acc_meta:.4f})")
 
     print(f"\n{'='*55}")
     print("  SUMMARY")
     print(f"{'='*55}")
     for name, acc in results.items():
         print(f"  {name:25s}  →  {acc:.4f}")
-    print(f"\n  📋  Weights  → ensemble_weights.json")
-    print(f"  📋  Classes  → {CLASSES_FILE}")
+    print(f"  Meta-Model (Stacking)      →  {val_acc_meta:.4f}")
+    print(f"\n  📋  Meta-Model  → meta_model.pkl")
+    print(f"  📋  Classes     → {CLASSES_FILE}")
 
 if __name__ == '__main__':
     train_model()

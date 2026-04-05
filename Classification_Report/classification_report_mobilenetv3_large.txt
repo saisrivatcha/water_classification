@@ -2,15 +2,15 @@ Classification Report for MobileNetV3-Large
 =======================================================
                   precision    recall  f1-score   support
 
-     Clean Water       0.77      1.00      0.87        20
-Industrail water       0.92      0.77      0.84        31
+     Clean Water       0.80      1.00      0.89        20
+Industrail water       0.92      0.71      0.80        31
             Lake       0.93      1.00      0.96        27
-     Muddy Water       0.89      0.94      0.92        18
-        Seawater       0.95      0.88      0.91        24
-        fishpond       0.93      0.88      0.90        16
-   pollutedwater       0.95      0.91      0.93        23
-      riverwater       0.86      0.86      0.86        14
+     Muddy Water       0.77      0.94      0.85        18
+        Seawater       0.90      0.75      0.82        24
+        fishpond       0.83      0.94      0.88        16
+   pollutedwater       0.91      0.87      0.89        23
+      riverwater       0.92      0.86      0.89        14
 
-        accuracy                           0.90       173
-       macro avg       0.90      0.90      0.90       173
-    weighted avg       0.91      0.90      0.90       173
+        accuracy                           0.87       173
+       macro avg       0.87      0.88      0.87       173
+    weighted avg       0.88      0.87      0.87       173
