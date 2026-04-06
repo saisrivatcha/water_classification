@@ -23,7 +23,7 @@ export default function AnomalyPage() {
   const runDetection = async () => {
     setBanner({ type:"loading", text:"Fetching anomalies from server..." });
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/anomaly_batch", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/anomaly_batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parameter: param, threshold })
