@@ -16,13 +16,13 @@ import joblib
 app = Flask(__name__, template_folder="templets", static_folder=".", static_url_path="")
 CORS(app)
 
-CLASSES_FILE    = 'classes.txt'
-META_MODEL_FILE = 'meta_model.pkl'
+CLASSES_FILE    = 'models/image_classification/classes.txt'
+META_MODEL_FILE = 'models/image_classification/meta_model.pkl'
 
 MODELS_CONFIG = [
-    {'name': 'EfficientNet-B3',   'path': 'model_efficientnet.pth'},
-    {'name': 'ResNet-50',         'path': 'model_resnet50.pth'},
-    {'name': 'MobileNetV3-Large', 'path': 'model_mobilenetv3.pth'},
+    {'name': 'EfficientNet-B3',   'path': 'models/image_classification/model_efficientnet.pth'},
+    {'name': 'ResNet-50',         'path': 'models/image_classification/model_resnet50.pth'},
+    {'name': 'MobileNetV3-Large', 'path': 'models/image_classification/model_mobilenetv3.pth'},
 ]
 
 # ─────────────────────────────────────────────
@@ -105,7 +105,7 @@ if num_classes > 0:
 #  Load forecast models
 # ─────────────────────────────────────────────
 forecast_models = {}
-MODEL_DIR = "forecast_models"
+MODEL_DIR = "models/forecast_regression"
 TARGET_COLUMNS = ["temperature", "dissolved_oxygen", "pH", "conductivity"]
 
 def load_forecast_models():
@@ -257,6 +257,7 @@ def api_forecast():
         fys.append(float(p + noise))
 
     return jsonify({
+        'historical': [float(x) for x in y_hist],
         'predictions': fys,
         'r2': float(round(r2, 4)),
         'slope_per_unit': float(slope_per_unit),
